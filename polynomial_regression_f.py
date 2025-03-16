@@ -61,7 +61,7 @@ mae = mean_absolute_error(test_output_standardizat, predictions_poly_standard)
 rmse = root_mean_squared_error(test_output_standardizat, predictions_poly_standard)
 r2 = r2_score(test_output_standardizat, predictions_poly_standard)
 
-print("\nRegresie Polinomiala (min-max norm):")
+print("\nRegresie Polinomiala (Standard norm):")
 print("Mean Squared Error (MSE):", mse)
 print("Mean Absolute Error (MAE):", mae)
 print("Root Mean Squared Error (RMSE):", rmse)
