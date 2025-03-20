@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from tkinter.filedialog import askopenfilename
 
+from sklearn.metrics import r2_score, mean_absolute_percentage_error,mean_squared_error, mean_absolute_error, root_mean_squared_error
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 
@@ -97,3 +98,18 @@ def shuffle_division(data, train_percent, input_columns, output_columns):
     test_output = test_data[output_columns].values.astype(np.float32)
 
     return train_input, train_output, test_input, test_output
+
+def calculate_metrics(test_output,predictions):
+    mse = mean_squared_error(test_output, predictions)
+    mae = mean_absolute_error(test_output, predictions)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(test_output, predictions)
+    mape = mean_absolute_percentage_error(test_output, predictions)
+
+    print("Mean Squared Error (MSE):", mse)
+    print("Mean Absolute Error (MAE):", mae)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R^2 Score:", r2)
+    print("Mean Absolute Percentage Error (MAPE):", mape)
+
+    return mse,mae,rmse,r2,mape

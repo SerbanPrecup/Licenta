@@ -29,28 +29,15 @@ rf_regressor = RandomForestRegressor(n_estimators=100, random_state=42)
 rf_regressor.fit(train_input_scaled, train_output_scaled)
 predictions = rf_regressor.predict(test_input_scaled)
 
-mse = mean_squared_error(test_output_scaled, predictions)
-mae = mean_absolute_error(test_output_scaled, predictions)
-rmse = root_mean_squared_error(test_output_scaled, predictions)
-r2 = r2_score(test_output_scaled, predictions)
 
 print("\nRandom Forest (min-max norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_scaled,mae_scaled,rmse_scaled,r2_scaled,mape_scaled = f.calculate_metrics(test_output_scaled,predictions)
+
 
 rf_regressor_standard = RandomForestRegressor(n_estimators=100, random_state=42)
 rf_regressor_standard.fit(train_input_standardizat, train_output_standardizat)
 predictions = rf_regressor_standard.predict(test_input_standardizat)
 
-mse = mean_squared_error(test_output_standardizat, predictions)
-mae = mean_absolute_error(test_output_standardizat, predictions)
-rmse = root_mean_squared_error(test_output_standardizat, predictions)
-r2 = r2_score(test_output_standardizat, predictions)
-
 print("\nRandom Forest (standard norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_standard,mae_standard,rmse_standard,r2_standard,mape_standard = (f.calculate_metrics(test_output_standardizat,predictions ))
+

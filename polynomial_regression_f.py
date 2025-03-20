@@ -35,16 +35,9 @@ lin = LinearRegression()
 lin.fit(train_input_poly, train_output_scaled)
 predictions_poly = lin.predict(test_input_poly)
 
-mse = mean_squared_error(test_output_scaled, predictions_poly)
-mae = mean_absolute_error(test_output_scaled, predictions_poly)
-rmse = root_mean_squared_error(test_output_scaled, predictions_poly)
-r2 = r2_score(test_output_scaled, predictions_poly)
 
 print("\nRegresie Polinomiala (min-max norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_scaled,mae_scaled,rmse_scaled,r2_scaled,mape_scaled = f.calculate_metrics(test_output_scaled,predictions_poly)
 
 
 poly_standard = PolynomialFeatures(degree=4)
@@ -56,14 +49,8 @@ lin_standard = LinearRegression()
 lin_standard.fit(train_input_poly_standard, train_output_standardizat)
 predictions_poly_standard = lin_standard.predict(test_input_poly_standard)
 
-mse = mean_squared_error(test_output_standardizat, predictions_poly_standard)
-mae = mean_absolute_error(test_output_standardizat, predictions_poly_standard)
-rmse = root_mean_squared_error(test_output_standardizat, predictions_poly_standard)
-r2 = r2_score(test_output_standardizat, predictions_poly_standard)
 
 print("\nRegresie Polinomiala (Standard norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_standard,mae_standard,rmse_standard,r2_standard,mape_standard = (f.calculate_metrics(test_output_standardizat,predictions_poly_standard ))
+
 

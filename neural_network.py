@@ -35,16 +35,9 @@ model.fit(train_input_scaled,train_output_scaled, epochs=30, batch_size=1, verbo
 predictions = model.predict(test_input_scaled)
 # predicted_label = (prediction > 0.5).astype(int)
 
-mse = mean_squared_error(test_output_scaled, predictions)
-mae = mean_absolute_error(test_output_scaled, predictions)
-rmse = root_mean_squared_error(test_output_scaled, predictions)
-r2 = r2_score(test_output_scaled, predictions)
 
 print("\nRegresie Liniara (min-max norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_scaled,mae_scaled,rmse_scaled,r2_scaled,mape_scaled = f.calculate_metrics(test_output_scaled,predictions)
 
 
 model_standard = Sequential()
@@ -55,14 +48,8 @@ model_standard.fit(train_input_standardizat,train_output_standardizat, epochs=30
 predictions = model_standard.predict(test_input_standardizat)
 # predicted_label = (prediction > 0.5).astype(int)
 
-mse = mean_squared_error(test_output_standardizat, predictions)
-mae = mean_absolute_error(test_output_standardizat, predictions)
-rmse = root_mean_squared_error(test_output_standardizat, predictions)
-r2 = r2_score(test_output_standardizat, predictions)
 
 print("\nRegresie Liniara (min-max norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_standard,mae_standard,rmse_standard,r2_standard,mape_standard = (f.calculate_metrics(test_output_standardizat,predictions ))
+
 

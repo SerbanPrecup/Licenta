@@ -31,31 +31,17 @@ svr = MultiOutputRegressor(SVR(kernel='rbf'))
 svr.fit(train_input_scaled, train_output_scaled)
 predictions = svr.predict(test_input_scaled)
 
-mse = mean_squared_error(test_output_scaled, predictions)
-mae = mean_absolute_error(test_output_scaled, predictions)
-rmse = root_mean_squared_error(test_output_scaled, predictions)
-r2 = r2_score(test_output_scaled, predictions)
 
 print("\nSupport Vector Regression (min-max norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_scaled,mae_scaled,rmse_scaled,r2_scaled,mape_scaled = f.calculate_metrics(test_output_scaled,predictions)
+
 
 svr_standard = MultiOutputRegressor(SVR(kernel='rbf'))
 svr_standard.fit(train_input_standardizat, train_output_standardizat)
 predictions = svr_standard.predict(test_input_standardizat)
 
-mse = mean_squared_error(test_output_standardizat, predictions)
-mae = mean_absolute_error(test_output_standardizat, predictions)
-rmse = root_mean_squared_error(test_output_standardizat, predictions)
-r2 = r2_score(test_output_standardizat, predictions)
-
 print("\nSupport Vector Regression (standard norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_standard,mae_standard,rmse_standard,r2_standard,mape_standard = (f.calculate_metrics(test_output_standardizat,predictions ))
 
 # SVR folosit pe fiecare coloana de output separat
 
@@ -70,17 +56,11 @@ predictions_ftag = svr_ftag.predict(test_input_scaled)
 
 predictions = np.column_stack((predictions_fthg, predictions_ftag))
 
-mse = mean_squared_error(test_output_scaled, predictions)
-mae = mean_absolute_error(test_output_scaled, predictions)
-rmse = root_mean_squared_error(test_output_scaled, predictions)
-r2 = r2_score(test_output_scaled, predictions)
 
 print("\n\nSupport Vector Regression pt fiecare coloana din output separat")
 print("Support Vector Regression (min-max norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_scaled,mae_scaled,rmse_scaled,r2_scaled,mape_scaled = f.calculate_metrics(test_output_scaled,predictions)
+
 
 svr_fthg_standard = SVR(kernel='rbf')
 svr_ftag_standard = SVR(kernel='rbf')
@@ -93,13 +73,7 @@ predictions_ftag_standard = svr_ftag_standard.predict(test_input_standardizat)
 
 predictions = np.column_stack((predictions_fthg_standard, predictions_ftag_standard))
 
-mse = mean_squared_error(test_output_standardizat, predictions)
-mae = mean_absolute_error(test_output_standardizat, predictions)
-rmse = root_mean_squared_error(test_output_standardizat, predictions)
-r2 = r2_score(test_output_standardizat, predictions)
 
 print("\nSupport Vector Regression (standard norm):")
-print("Mean Squared Error (MSE):", mse)
-print("Mean Absolute Error (MAE):", mae)
-print("Root Mean Squared Error (RMSE):", rmse)
-print("R^2 Score:", r2)
+mse_standard,mae_standard,rmse_standard,r2_standard,mape_standard = (f.calculate_metrics(test_output_standardizat,predictions ))
+
