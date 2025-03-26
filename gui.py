@@ -43,6 +43,18 @@ class Application(tk.Tk):
                                                'Gradient Boosting', 'Arbore de decizie'], state='readonly')
         self.combo_algo.grid(row=0, column=1, padx=5, pady=5)
 
+        # settings_frame = ttk.LabelFrame(self, text="Configurare model")
+        # settings_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(settings_frame, text="Metoda de tuning:").grid(row=1, column=0, padx=5, pady=5)
+        self.tune_var = tk.StringVar()
+        self.combo_tune = ttk.Combobox(settings_frame, textvariable=self.tune_var,
+                                       values=['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+                                       state='readonly')
+        self.combo_tune.grid(row=1, column=1, padx=5, pady=5)
+        self.combo_tune.set('Niciuna')
+
+
         ttk.Label(settings_frame, text="Normalizare:").grid(row=0, column=2, padx=5, pady=5)
         self.norm_var = tk.StringVar()
         self.combo_norm = ttk.Combobox(settings_frame, textvariable=self.norm_var,
@@ -50,12 +62,16 @@ class Application(tk.Tk):
         self.combo_norm.grid(row=0, column=3, padx=5, pady=5)
         self.combo_norm.set('Niciuna')
 
+
+
+
         ttk.Label(settings_frame, text="Split Train-Test:").grid(row=0, column=4, padx=5, pady=5)
         self.split_var = tk.StringVar()
         self.combo_split = ttk.Combobox(settings_frame, textvariable=self.split_var,
                                         values=['90-10','80-20', '70-30', '60-40', '50-50',  '40-60', '35-65'], state='readonly')
         self.combo_split.grid(row=0, column=5, padx=5, pady=5)
         self.combo_split.set('80-20')
+
 
         self.btn_run = ttk.Button(self, text="Antrenează modelul", command=self.run_algorithm)
         self.btn_run.pack(pady=10)
@@ -94,6 +110,21 @@ class Application(tk.Tk):
             return
 
         algorithm = self.algo_var.get()
+        tuning_method = self.tune_var.get()
+        available_tuning = {
+            'Regresie liniară': ['Niciuna', 'Grid Search'],
+            'Regresie polinomială': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Regresie Poisson': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'SVR': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Random Forest': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Rețea neuronală': ['Niciuna'],
+            'Gradient Boosting': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Arbore de decizie': ['Niciuna', 'Grid Search', 'Bayesian Optimization']
+        }
+
+        if tuning_method not in available_tuning.get(algorithm, ['Niciuna']):
+            messagebox.showerror("Eroare", f"Metoda {tuning_method} nu este disponibilă pentru {algorithm}")
+            return
         normalization = self.norm_var.get()
 
         if not algorithm:
@@ -120,21 +151,58 @@ class Application(tk.Tk):
                 train_in, train_out, test_in, test_out = train_input, train_output, test_input, test_output
 
             if algorithm == 'Regresie liniară':
-                metrics = alg.linear_regression(train_in, train_out, test_in, test_out)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_linear_regression_grid_search(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.linear_regression(train_in, train_out, test_in, test_out)
+
             elif algorithm == 'Regresie polinomială':
-                metrics = alg.polynomial_regression(train_in, train_out, test_in, test_out, degree=2)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_polynomial_regression_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_polynomial_regression_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.polynomial_regression(train_in, train_out, test_in, test_out, degree=2)
+
             elif algorithm == 'Regresie Poisson':
-                metrics = alg.poisson_regression(train_in, train_out, test_in, test_out, alpha=0.01)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_poisson_regression_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_poisson_regression_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.poisson_regression(train_in, train_out, test_in, test_out, alpha=0.01)
+
             elif algorithm == 'SVR':
-                metrics = alg.svr(train_in, train_out, test_in, test_out)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_svr_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_svr_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.svr(train_in, train_out, test_in, test_out)
+
             elif algorithm == 'Random Forest':
-                metrics = alg.random_forest(train_in, train_out, test_in, test_out)
-            elif algorithm == 'Rețea neuronală':
-                metrics = alg.neural_network(train_in, train_out, test_in, test_out)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_random_forest_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_random_forest_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.random_forest(train_in, train_out, test_in, test_out)
+
             elif algorithm == 'Gradient Boosting':
-                metrics = alg.gradient_boosting(train_in, train_out, test_in, test_out, SEED=42)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_gradient_boosting_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_gradient_boosting_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.gradient_boosting(train_in, train_out, test_in, test_out)
+
             elif algorithm == 'Arbore de decizie':
-                metrics = alg.decision_tree(train_in, train_out, test_in, test_out, max_depth=5)
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_decision_tree_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_decision_tree_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.decision_tree(train_in, train_out, test_in, test_out, max_depth=5)
             else:
                 messagebox.showerror("Eroare", "Algoritm necunoscut!")
                 return
