@@ -27,6 +27,11 @@ def select_file():
         print(f"Eroare la încărcarea fișierului: {str(e)}")
         sys.exit(1)
 
+def select_data_prestabilite(data):
+    input_columns = ["B365H","B365D","B365A"]
+    output_columns = ["FTHG","FTAG"]
+    return input_columns, output_columns
+
 
 def select_data(data):
     input_columns = []
