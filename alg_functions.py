@@ -1,3 +1,5 @@
+import numpy as np
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -8,8 +10,7 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.preprocessing import SplineTransformer
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVR
-from tensorflow.python.keras import Sequential
-from tensorflow.python.keras.layers import Dense
+
 from scipy.stats import loguniform, randint, uniform
 from bayes_opt import BayesianOptimization
 
@@ -29,7 +30,7 @@ def optimized_linear_regression_grid_search(train_input, train_output, test_inpu
         'fit_intercept': [True, False],
         'positive': [True, False]
     }
-    grid_search = GridSearchCV(model, param_grid, cv=5, scoring='r2')
+    grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
     grid_search.fit(train_input, train_output)
 
     best_model = grid_search.best_estimator_
@@ -59,7 +60,7 @@ def optimized_polynomial_regression_grid_search(train_input, train_output, test_
         'poly__degree': [1, 2, 3, 4, 5]
     }
 
-    grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='r2')
+    grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_squared_error')
     grid_search.fit(train_input, train_output)
 
     best_model = grid_search.best_estimator_
@@ -131,7 +132,7 @@ def optimized_poisson_regression_grid_search(train_input, train_output, test_inp
         pipeline,
         param_grid,
         cv=5,
-        scoring='r2',
+        scoring='neg_mean_squared_error',
         n_jobs=-1
     )
 
@@ -211,7 +212,7 @@ def optimized_svr_grid_search(train_input, train_output, test_input, test_output
         pipeline,
         param_grid,
         cv=5,
-        scoring='r2',
+        scoring='neg_mean_squared_error',
         n_jobs=-1
     )
 
@@ -296,7 +297,7 @@ def optimized_random_forest_grid_search(train_input, train_output, test_input, t
         rf,
         param_grid,
         cv=5,
-        scoring='r2',
+        scoring='neg_mean_squared_error',
         n_jobs=-1
     )
     grid_search.fit(train_input, train_output)
@@ -365,6 +366,8 @@ def optimized_random_forest_bayesian(train_input, train_output, test_input, test
 
 
 def neural_network(train_input, train_output, test_input, test_output):
+    from tensorflow.python.keras import Sequential
+    from tensorflow.python.keras.layers import Dense
     model = Sequential()
     model.add(Dense(8, input_dim=3, activation='relu'))
     model.add(Dense(2, activation='linear'))
@@ -372,6 +375,32 @@ def neural_network(train_input, train_output, test_input, test_output):
     model.fit(train_input, train_output, epochs=30, batch_size=1, verbose=1)
     predictions = model.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
+
+
+def neural_network_from_zero(train_input, train_output, test_input, test_output):
+    import neural_network_functions as nf
+
+    HL, OUT, erori_antrenare = nf.antrenare(
+        neuronsHL=15,
+        LR=0.01,
+        nrEpoci=200,
+        train_input=train_input,
+        train_output=train_output
+    )
+
+    mse, mae, rmse, r2 = nf.testare(
+        test_input=test_input,
+        test_output=test_output,
+        HL=HL,
+        OUT=OUT
+    )
+
+    print("Mean Squared Error (MSE):", mse)
+    print("Mean Absolute Error (MAE):", mae)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R^2 Score:", r2)
+
+    return mse,mae,rmse,r2
 
 
 def gradient_boosting(train_input, train_output, test_input, test_output):
@@ -406,7 +435,7 @@ def optimized_gradient_boosting_grid_search(train_input, train_output, test_inpu
         gbr,
         param_grid,
         cv=5,
-        scoring='r2',
+        scoring='neg_mean_squared_error',
         n_jobs=-1
     )
 
@@ -503,7 +532,7 @@ def optimized_decision_tree_grid_search(train_input, train_output, test_input, t
         dt,
         param_grid,
         cv=5,
-        scoring='r2',
+        scoring='neg_mean_squared_error',
         n_jobs=-1
     )
     grid_search.fit(train_input, train_output)
