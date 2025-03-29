@@ -109,12 +109,10 @@ def calculate_metrics(test_output,predictions):
     mae = mean_absolute_error(test_output, predictions)
     rmse = np.sqrt(mse)
     r2 = r2_score(test_output, predictions)
-    mape = mean_absolute_percentage_error(test_output, predictions)
 
     print("Mean Squared Error (MSE):", mse)
     print("Mean Absolute Error (MAE):", mae)
     print("Root Mean Squared Error (RMSE):", rmse)
     print("R^2 Score:", r2)
-    print("Mean Absolute Percentage Error (MAPE):", mape)
 
-    return mse,mae,rmse,r2,mape
+    return mse,mae,rmse,r2
