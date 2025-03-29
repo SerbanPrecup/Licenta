@@ -15,6 +15,7 @@ from scipy.stats import loguniform, randint, uniform
 from bayes_opt import BayesianOptimization
 
 import functions as f
+from linear_regression_functions import LinearRegressionFromZero
 
 
 def linear_regression(train_input, train_output, test_input, test_output):
@@ -37,6 +38,76 @@ def optimized_linear_regression_grid_search(train_input, train_output, test_inpu
     predictions = best_model.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
+def linear_regression_from_zero(train_input, train_output, test_input, test_output, lr=0.02, iters=2000):
+    lin = LinearRegressionFromZero()
+    param,loss = lin.train(train_input, train_output,0.02,2000)
+    return lin.evaluate(test_input, test_output)
+
+
+def optimized_linear_regression_from_zero_grid_search(train_input, train_output, test_input, test_output):
+    best_mse = float('inf')
+    best_params = {}
+
+    param_grid = {
+        'learning_rate': [0.001, 0.01, 0.02, 0.1],
+        'iterations': [500, 1000, 2000, 3000]
+    }
+
+    for lr in param_grid['learning_rate']:
+        for iters in param_grid['iterations']:
+            model = LinearRegressionFromZero()
+            params, loss = model.train(train_input, train_output, lr, iters)
+
+            predictions = model.predict(train_input)
+            current_mse = mean_squared_error(train_output, predictions)
+
+            if current_mse < best_mse:
+                best_mse = current_mse
+                best_params = {'learning_rate': lr, 'iterations': iters}
+
+    final_model = LinearRegressionFromZero()
+    params, loss = final_model.train(train_input, train_output,
+                                     best_params['learning_rate'],
+                                     best_params['iterations'])
+
+    return final_model.evaluate(test_input, test_output), best_params
+
+
+def optimized_linear_regression_from_zero_bayesian(train_input, train_output, test_input, test_output):
+    def objective_function(learning_rate, iterations):
+        lr = max(learning_rate, 1e-5) #evitare valori negative
+        iters = int(round(iterations))
+
+        model = LinearRegressionFromZero()
+        _, loss = model.train(train_input, train_output, lr, iters)
+
+        return -loss[-1]
+
+    pbounds = {
+        'learning_rate': (0.0001, 0.2),
+        'iterations': (100, 5000)
+    }
+
+    optimizer = BayesianOptimization(
+        f=objective_function,
+        pbounds=pbounds,
+        random_state=42,
+        allow_duplicate_points=True
+    )
+
+    optimizer.maximize(
+        init_points=5,
+        n_iter=20
+    )
+
+    best_params = optimizer.max['params']
+    best_lr = best_params['learning_rate']
+    best_iters = int(round(best_params['iterations']))
+
+    final_model = LinearRegressionFromZero()
+    final_model.train(train_input, train_output, best_lr, best_iters)
+
+    return final_model.evaluate(test_input, test_output), best_params
 
 def polynomial_regression(train_input, train_output, test_input, test_output, degree):
     poly = PolynomialFeatures(degree=degree)
@@ -366,8 +437,9 @@ def optimized_random_forest_bayesian(train_input, train_output, test_input, test
 
 
 def neural_network(train_input, train_output, test_input, test_output):
-    from tensorflow.python.keras import Sequential
-    from tensorflow.python.keras.layers import Dense
+    from tensorflow.keras import Sequential
+    from tensorflow.keras.layers import Dense
+
     model = Sequential()
     model.add(Dense(8, input_dim=3, activation='relu'))
     model.add(Dense(2, activation='linear'))
@@ -376,6 +448,124 @@ def neural_network(train_input, train_output, test_input, test_output):
     predictions = model.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
+def optimized_neural_network_grid_search(train_input, train_output, test_input, test_output):
+    from tensorflow.python.keras import Sequential
+    from tensorflow.python.keras.layers import Dense
+    # from tensorflow.python.keras.wrappers.scikit_learn import KerasRegressor
+    from sklearn.model_selection import GridSearchCV
+
+    def create_model(units=8, activation='relu', optimizer='adam'):
+        model = Sequential()
+        model.add(Dense(units, input_dim=3, activation=activation))
+        model.add(Dense(2, activation='linear'))
+        model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mae'])
+        return model
+
+    # model = KerasRegressor(build_fn=create_model, verbose=0)
+
+    param_grid = {
+        'units': [8, 16, 32],
+        'activation': ['relu', 'tanh'],
+        'optimizer': ['adam', 'sgd'],
+        'batch_size': [1, 10, 20],
+        'epochs': [30, 50]
+    }
+
+    grid_search = GridSearchCV(
+        # estimator=model,
+        param_grid=param_grid,
+        cv=5,
+        scoring='neg_mean_squared_error',
+        n_jobs=1
+    )
+
+    grid_search.fit(train_input, train_output)
+
+    best_model = grid_search.best_estimator_
+
+    predictions = best_model.predict(test_input)
+
+    return f.calculate_metrics(test_output, predictions)
+
+
+def optimized_neural_network_bayesian(train_input, train_output, test_input, test_output):
+    from tensorflow.python.keras import Sequential
+    from tensorflow.python.keras.layers import Dense
+    # from tensorflow.python.keras.optimizers import Adam, SGD
+    from bayes_opt import BayesianOptimization
+    from sklearn.model_selection import train_test_split
+
+    X_train, X_val, y_train, y_val = train_test_split(
+        train_input, train_output,
+        test_size=0.2,
+        random_state=42
+    )
+
+    def objective_function(units, lr, batch_size, epochs, activation_param, optimizer_param):
+        units = int(round(units))
+        batch_size = int(round(batch_size))
+        epochs = int(round(epochs))
+
+        activation = "relu" if activation_param < 0.5 else "tanh"
+        # optimizer = Adam(learning_rate=lr) if optimizer_param < 0.5 else SGD(learning_rate=lr)
+
+        model = Sequential([
+            Dense(units, input_dim=3, activation=activation),
+            Dense(2, activation='linear')
+        ])
+        model.compile(loss='mse', optimizer=optimizer)
+
+        history = model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=epochs,
+            batch_size=batch_size,
+            verbose=0
+        )
+
+        return -history.history['val_loss'][-1]
+
+    param_bounds = {
+        'units': (8, 64),
+        'lr': (0.0001, 0.1),
+        'batch_size': (8, 64),
+        'epochs': (20, 100),
+        'activation_param': (0, 1),
+        'optimizer_param': (0, 1)
+    }
+
+    optimizer = BayesianOptimization(
+        f=objective_function,
+        pbounds=param_bounds,
+        random_state=42
+    )
+
+    optimizer.maximize(init_points=10, n_iter=20)
+
+    best_params = optimizer.max['params']
+    final_params = {
+        'units': int(round(best_params['units'])),
+        'activation': 'relu' if best_params['activation_param'] < 0.5 else 'tanh',
+        'optimizer': 'adam' if best_params['optimizer_param'] < 0.5 else 'sgd',
+        'lr': best_params['lr'],
+        'batch_size': int(round(best_params['batch_size'])),
+        'epochs': int(round(best_params['epochs']))
+    }
+
+    # final_optimizer = Adam(lr=final_params['lr']) if final_params['optimizer'] == 'adam' else SGD(lr=final_params['lr'])
+
+    final_model = Sequential([
+        Dense(final_params['units'], input_dim=3, activation=final_params['activation']),
+        Dense(2, activation='linear')
+    ])
+    # final_model.compile(loss='mse', optimizer=final_optimizer)
+    final_model.fit(train_input, train_output, epochs=final_params['epochs'], batch_size=final_params['batch_size'],
+                    verbose=0)
+
+    predictions = final_model.predict(test_input)
+    metrics = f.calculate_metrics(test_output, predictions)
+
+    return metrics, final_params
 
 def neural_network_from_zero(train_input, train_output, test_input, test_output):
     import neural_network_functions as nf
@@ -400,7 +590,122 @@ def neural_network_from_zero(train_input, train_output, test_input, test_output)
     print("Root Mean Squared Error (RMSE):", rmse)
     print("R^2 Score:", r2)
 
-    return mse,mae,rmse,r2
+    return mse, mae, rmse, r2
+
+
+def optimized_neural_network_from_zero_grid_search(train_input, train_output, test_input, test_output):
+    import neural_network_functions as nf
+    from sklearn.model_selection import ParameterGrid, KFold
+    import numpy as np
+
+    param_grid = {
+        'neuronsHL': [3, 5, 15, 25],
+        'LR': [0.001, 0.01, 0.02, 0.1],
+        'nrEpoci': [50, 100, 200, 300]
+    }
+
+    best_score = np.inf
+    best_params = {}
+
+    for params in ParameterGrid(param_grid):
+
+        kf = KFold(n_splits=5)
+        fold_scores = []
+
+        for train_idx, val_idx in kf.split(train_input):
+            X_train, X_val = train_input[train_idx], train_input[val_idx]
+            y_train, y_val = train_output[train_idx], train_output[val_idx]
+
+            HL, OUT, _ = nf.antrenare(
+                neuronsHL=params['neuronsHL'],
+                LR=params['LR'],
+                nrEpoci=params['nrEpoci'],
+                train_input=X_train,
+                train_output=y_train
+            )
+
+            mse, _, _, _ = nf.testare(X_val, y_val, HL, OUT)
+            fold_scores.append(mse)
+
+        avg_mse = np.mean(fold_scores)
+
+        if avg_mse < best_score:
+            best_score = avg_mse
+            best_params = params
+
+    HL, OUT, _ = nf.antrenare(
+        neuronsHL=best_params['neuronsHL'],
+        LR=best_params['LR'],
+        nrEpoci=best_params['nrEpoci'],
+        train_input=train_input,
+        train_output=train_output
+    )
+
+    mse, mae, rmse, r2 = nf.testare(test_input, test_output, HL, OUT)
+
+    print("Mean Squared Error (MSE):", mse)
+    print("Mean Absolute Error (MAE):", mae)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R^2 Score:", r2)
+
+    return mse, mae, rmse, r2
+
+
+def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_input, test_output):
+    import neural_network_functions as nf
+    from bayes_opt import BayesianOptimization
+
+    def objective_function(neuronsHL, LR, nrEpoci):
+        params = {
+            'neuronsHL': int(round(neuronsHL)),
+            'LR': max(LR, 0.001),
+            'nrEpoci': int(round(nrEpoci))
+        }
+
+        HL, OUT, _ = nf.antrenare(
+            train_input=train_input,
+            train_output=train_output,
+            **params
+        )
+
+        mse, _, _, _ = nf.testare(test_input, test_output, HL, OUT)
+        return -mse
+
+    param_bounds = {
+        'neuronsHL': (5, 50),
+        'LR': (0.001, 0.1),
+        'nrEpoci': (30, 400)
+    }
+
+    optimizer = BayesianOptimization(
+        f=objective_function,
+        pbounds=param_bounds,
+        random_state=42
+    )
+
+    optimizer.maximize(init_points=5, n_iter=20)
+
+    best_params = optimizer.max['params']
+    best_params = {
+        'neuronsHL': int(round(best_params['neuronsHL'])),
+        'LR': best_params['LR'],
+        'nrEpoci': int(round(best_params['nrEpoci']))
+    }
+
+    HL, OUT, _ = nf.antrenare(
+        train_input=train_input,
+        train_output=train_output,
+        **best_params
+    )
+
+    mse, mae, rmse, r2 = nf.testare(test_input, test_output, HL, OUT)
+
+    print("Mean Squared Error (MSE):", mse)
+    print("Mean Absolute Error (MAE):", mae)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R^2 Score:", r2)
+
+    return mse, mae, rmse, r2
 
 
 def gradient_boosting(train_input, train_output, test_input, test_output):
@@ -563,7 +868,6 @@ def optimized_decision_tree_bayesian(train_input, train_output, test_input, test
 
         metrics = f.calculate_metrics(test_output, predictions)
         return -metrics[0]
-
 
     param_bounds = {
         "max_depth": (1, 30),

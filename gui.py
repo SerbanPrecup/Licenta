@@ -1,9 +1,9 @@
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 import functions as f
 import alg_functions as alg
 import pandas as pd
+
 
 class Application(tk.Tk):
     def __init__(self):
@@ -38,9 +38,18 @@ class Application(tk.Tk):
         ttk.Label(settings_frame, text="Alege algoritmul:").grid(row=0, column=0, padx=5, pady=5)
         self.algo_var = tk.StringVar()
         self.combo_algo = ttk.Combobox(settings_frame, textvariable=self.algo_var,
-                                       values=['Regresie liniară', 'Regresie polinomială', 'Regresie Poisson',
-                                               'SVR', 'Random Forest', 'Rețea neuronală',
-                                               'Gradient Boosting', 'Arbore de decizie'], state='readonly')
+                                       values=[
+                                           'Regresie liniara',
+                                           'Regresie liniara (from zero)',
+                                           'Regresie polinomiala',
+                                           'Regresie Poisson',
+                                           'SVR',
+                                           'Random Forest',
+                                           'Retea neuronala(Keras)',
+                                           'Retea neuronala(from zero)',
+                                           'Gradient Boosting',
+                                           'Arbore de decizie'
+                                       ], state='readonly')
         self.combo_algo.grid(row=0, column=1, padx=5, pady=5)
 
         # settings_frame = ttk.LabelFrame(self, text="Configurare model")
@@ -54,7 +63,6 @@ class Application(tk.Tk):
         self.combo_tune.grid(row=1, column=1, padx=5, pady=5)
         self.combo_tune.set('Niciuna')
 
-
         ttk.Label(settings_frame, text="Normalizare:").grid(row=0, column=2, padx=5, pady=5)
         self.norm_var = tk.StringVar()
         self.combo_norm = ttk.Combobox(settings_frame, textvariable=self.norm_var,
@@ -62,16 +70,13 @@ class Application(tk.Tk):
         self.combo_norm.grid(row=0, column=3, padx=5, pady=5)
         self.combo_norm.set('Niciuna')
 
-
-
-
         ttk.Label(settings_frame, text="Split Train-Test:").grid(row=0, column=4, padx=5, pady=5)
         self.split_var = tk.StringVar()
         self.combo_split = ttk.Combobox(settings_frame, textvariable=self.split_var,
-                                        values=['90-10','80-20', '70-30', '60-40', '50-50',  '40-60', '35-65'], state='readonly')
+                                        values=['90-10', '80-20', '70-30', '60-40', '50-50', '40-60', '35-65'],
+                                        state='readonly')
         self.combo_split.grid(row=0, column=5, padx=5, pady=5)
         self.combo_split.set('80-20')
-
 
         self.btn_run = ttk.Button(self, text="Antrenează modelul", command=self.run_algorithm)
         self.btn_run.pack(pady=10)
@@ -112,12 +117,14 @@ class Application(tk.Tk):
         algorithm = self.algo_var.get()
         tuning_method = self.tune_var.get()
         available_tuning = {
-            'Regresie liniară': ['Niciuna', 'Grid Search'],
-            'Regresie polinomială': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Regresie liniara': ['Niciuna', 'Grid Search'],
+            'Regresie liniara (from zero)': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Regresie polinomiala': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Regresie Poisson': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'SVR': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Random Forest': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
-            'Rețea neuronală': ['Niciuna'],
+            'Retea neuronala(Keras)': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
+            'Retea neuronala(from zero)': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Gradient Boosting': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Arbore de decizie': ['Niciuna', 'Grid Search', 'Bayesian Optimization']
         }
@@ -150,13 +157,24 @@ class Application(tk.Tk):
             else:
                 train_in, train_out, test_in, test_out = train_input, train_output, test_input, test_output
 
-            if algorithm == 'Regresie liniară':
+            if algorithm == 'Regresie liniara':
                 if tuning_method == 'Grid Search':
-                    metrics = alg.optimized_linear_regression_grid_search(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_linear_regression_from_zero_grid_search(train_in, train_out,
+                                                                                            test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, params = alg.optimized_linear_regression_from_zero_bayesian(train_in, train_out, test_in,
+                                                                                         test_out)
                 else:
                     metrics = alg.linear_regression(train_in, train_out, test_in, test_out)
 
-            elif algorithm == 'Regresie polinomială':
+            elif algorithm == 'Regresie liniara (from zero)':
+                if tuning_method == 'Grid Search':
+                    metrics, _ = alg.optimized_linear_regression_from_zero_grid_search(train_in, train_out, test_in,
+                                                                                       test_out)
+                else:
+                    metrics = alg.linear_regression_from_zero(train_in, train_out, test_in, test_out)
+
+            elif algorithm == 'Regresie polinomiala':
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_polynomial_regression_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
@@ -188,6 +206,22 @@ class Application(tk.Tk):
                 else:
                     metrics = alg.random_forest(train_in, train_out, test_in, test_out)
 
+            elif algorithm == 'Retea neuronala(Keras)':
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_neural_network_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_neural_network_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.neural_network(train_in, train_out, test_in, test_out)
+
+            elif algorithm == 'Retea neuronala(from zero)':
+                if tuning_method == 'Grid Search':
+                    metrics = alg.optimized_neural_network_from_zero_grid_search(train_in, train_out, test_in, test_out)
+                elif tuning_method == 'Bayesian Optimization':
+                    metrics, _ = alg.optimized_neural_network_from_zero_bayesian(train_in, train_out, test_in, test_out)
+                else:
+                    metrics = alg.neural_network_from_zero(train_in, train_out, test_in, test_out)
+
             elif algorithm == 'Gradient Boosting':
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_gradient_boosting_grid_search(train_in, train_out, test_in, test_out)
@@ -213,10 +247,10 @@ class Application(tk.Tk):
             self.results_text.insert(tk.END, f"MAE: {metrics[1]:}\n")
             self.results_text.insert(tk.END, f"RMSE: {metrics[2]:}\n")
             self.results_text.insert(tk.END, f"R²: {metrics[3]:}\n")
-            self.results_text.insert(tk.END, f"MAPE: {metrics[4]:}\n")
 
         except Exception as e:
             messagebox.showerror("Eroare", f"A apărut o eroare: {str(e)}")
+
 
 # if __name__ == "__main__":
 app = Application()
