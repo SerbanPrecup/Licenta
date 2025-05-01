@@ -90,6 +90,7 @@ class Application(tk.Tk):
     def load_file(self):
         self.data = f.select_file()
         if self.data is not None:
+            self.data.dropna(inplace=True)
             self.update_columns_list()
 
     def update_columns_list(self):
@@ -109,6 +110,7 @@ class Application(tk.Tk):
 
         input_cols = self.get_selected_columns(self.listbox_input)
         output_cols = self.get_selected_columns(self.listbox_output)
+        feature_names = input_cols
 
         if not input_cols or not output_cols:
             messagebox.showerror("Eroare", "Selectează coloane pentru input și output!")
@@ -204,7 +206,7 @@ class Application(tk.Tk):
                 elif tuning_method == 'Bayesian Optimization':
                     metrics, _ = alg.optimized_random_forest_bayesian(train_in, train_out, test_in, test_out)
                 else:
-                    metrics = alg.random_forest(train_in, train_out, test_in, test_out)
+                    metrics = alg.random_forest_features_importances(train_in, train_out, test_in, test_out,feature_names)
 
             elif algorithm == 'Retea neuronala(Keras)':
                 if tuning_method == 'Grid Search':
@@ -236,7 +238,7 @@ class Application(tk.Tk):
                 elif tuning_method == 'Bayesian Optimization':
                     metrics, _ = alg.optimized_decision_tree_bayesian(train_in, train_out, test_in, test_out)
                 else:
-                    metrics = alg.decision_tree(train_in, train_out, test_in, test_out, max_depth=5)
+                    metrics = alg.decision_tree_features_importance(train_in, train_out, test_in, test_out, max_depth=5, feature_names=feature_names)
             else:
                 messagebox.showerror("Eroare", "Algoritm necunoscut!")
                 return

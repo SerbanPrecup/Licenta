@@ -1,4 +1,5 @@
 import numpy as np
+from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.tree import DecisionTreeRegressor
@@ -10,8 +11,7 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.preprocessing import SplineTransformer
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.svm import SVR
-
-from scipy.stats import loguniform, randint, uniform
+import json
 from bayes_opt import BayesianOptimization
 
 import functions as f
@@ -38,9 +38,10 @@ def optimized_linear_regression_grid_search(train_input, train_output, test_inpu
     predictions = best_model.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
+
 def linear_regression_from_zero(train_input, train_output, test_input, test_output, lr=0.02, iters=2000):
     lin = LinearRegressionFromZero()
-    param,loss = lin.train(train_input, train_output,0.02,2000)
+    param, loss = lin.train(train_input, train_output, 0.02, 2000)
     return lin.evaluate(test_input, test_output)
 
 
@@ -52,7 +53,7 @@ def optimized_linear_regression_from_zero_grid_search(train_input, train_output,
         'learning_rate': [0.001, 0.01, 0.02, 0.1],
         'iterations': [500, 1000, 2000, 3000]
     }
-
+    i = 1
     for lr in param_grid['learning_rate']:
         for iters in param_grid['iterations']:
             model = LinearRegressionFromZero()
@@ -60,7 +61,8 @@ def optimized_linear_regression_from_zero_grid_search(train_input, train_output,
 
             predictions = model.predict(train_input)
             current_mse = mean_squared_error(train_output, predictions)
-
+            print("mse combinatia cu numarul ", i, ": ", current_mse)
+            i += 1
             if current_mse < best_mse:
                 best_mse = current_mse
                 best_params = {'learning_rate': lr, 'iterations': iters}
@@ -75,7 +77,7 @@ def optimized_linear_regression_from_zero_grid_search(train_input, train_output,
 
 def optimized_linear_regression_from_zero_bayesian(train_input, train_output, test_input, test_output):
     def objective_function(learning_rate, iterations):
-        lr = max(learning_rate, 1e-5) #evitare valori negative
+        lr = max(learning_rate, 1e-5)  # evitare valori negative
         iters = int(round(iterations))
 
         model = LinearRegressionFromZero()
@@ -108,6 +110,7 @@ def optimized_linear_regression_from_zero_bayesian(train_input, train_output, te
     final_model.train(train_input, train_output, best_lr, best_iters)
 
     return final_model.evaluate(test_input, test_output), best_params
+
 
 def polynomial_regression(train_input, train_output, test_input, test_output, degree):
     poly = PolynomialFeatures(degree=degree)
@@ -353,6 +356,17 @@ def random_forest(train_input, train_output, test_input, test_output):
     predictions = rf_regressor.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
+def random_forest_features_importances(train_input, train_output, test_input, test_output,feature_names):
+    rf_regressor = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf_regressor.fit(train_input, train_output)
+    importance = rf_regressor.feature_importances_
+    plt.bar(range(train_input.shape[1]),importance)
+    plt.xticks(range(train_input.shape[1]),feature_names, rotation=90)
+    plt.title('Feature Importances - Random Forest')
+    plt.show()
+    predictions = rf_regressor.predict(test_input)
+    return f.calculate_metrics(test_output, predictions)
+
 
 def optimized_random_forest_grid_search(train_input, train_output, test_input, test_output):
     rf = RandomForestRegressor(random_state=42)
@@ -448,10 +462,12 @@ def neural_network(train_input, train_output, test_input, test_output):
     predictions = model.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
-def optimized_neural_network_grid_search(train_input, train_output, test_input, test_output):
+
+def optimized_neural_network_grid_search(train_input, train_output, test_input, test_output,
+                                         save_path="best_hyperparameters_grid_search.json"):
     from tensorflow.python.keras import Sequential
     from tensorflow.python.keras.layers import Dense
-    # from tensorflow.python.keras.wrappers.scikit_learn import KerasRegressor
+    from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
     from sklearn.model_selection import GridSearchCV
 
     def create_model(units=8, activation='relu', optimizer='adam'):
@@ -461,7 +477,7 @@ def optimized_neural_network_grid_search(train_input, train_output, test_input, 
         model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mae'])
         return model
 
-    # model = KerasRegressor(build_fn=create_model, verbose=0)
+    model = KerasRegressor(build_fn=create_model, verbose=0)
 
     param_grid = {
         'units': [8, 16, 32],
@@ -472,7 +488,7 @@ def optimized_neural_network_grid_search(train_input, train_output, test_input, 
     }
 
     grid_search = GridSearchCV(
-        # estimator=model,
+        estimator=model,
         param_grid=param_grid,
         cv=5,
         scoring='neg_mean_squared_error',
@@ -481,17 +497,33 @@ def optimized_neural_network_grid_search(train_input, train_output, test_input, 
 
     grid_search.fit(train_input, train_output)
 
+    best_params = grid_search.best_params_
+
     best_model = grid_search.best_estimator_
 
     predictions = best_model.predict(test_input)
 
-    return f.calculate_metrics(test_output, predictions)
+    metrics = f.calculate_metrics(test_output, predictions)
+
+    # Salvez cei mai buni hiperparametri
+    hyperparam_data = {
+        "method": "grid_search",
+        "best_hyperparameters": best_params
+    }
+
+    with open(save_path, "w") as f_out:
+        json.dump(hyperparam_data, f_out, indent=4)
+
+    print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
+
+    return metrics, best_params
 
 
-def optimized_neural_network_bayesian(train_input, train_output, test_input, test_output):
+def optimized_neural_network_bayesian(train_input, train_output, test_input, test_output,
+                                      save_path="best_hyperparameters_bayesian.json"):
     from tensorflow.python.keras import Sequential
     from tensorflow.python.keras.layers import Dense
-    # from tensorflow.python.keras.optimizers import Adam, SGD
+    from tensorflow.keras.optimizers import Adam, SGD
     from bayes_opt import BayesianOptimization
     from sklearn.model_selection import train_test_split
 
@@ -507,7 +539,7 @@ def optimized_neural_network_bayesian(train_input, train_output, test_input, tes
         epochs = int(round(epochs))
 
         activation = "relu" if activation_param < 0.5 else "tanh"
-        # optimizer = Adam(learning_rate=lr) if optimizer_param < 0.5 else SGD(learning_rate=lr)
+        optimizer = Adam(learning_rate=lr) if optimizer_param < 0.5 else SGD(learning_rate=lr)
 
         model = Sequential([
             Dense(units, input_dim=3, activation=activation),
@@ -552,20 +584,38 @@ def optimized_neural_network_bayesian(train_input, train_output, test_input, tes
         'epochs': int(round(best_params['epochs']))
     }
 
-    # final_optimizer = Adam(lr=final_params['lr']) if final_params['optimizer'] == 'adam' else SGD(lr=final_params['lr'])
+    final_optimizer = Adam(learning_rate=final_params['lr']) if final_params['optimizer'] == 'adam' else SGD(
+        learning_rate=final_params['lr'])
 
     final_model = Sequential([
         Dense(final_params['units'], input_dim=3, activation=final_params['activation']),
         Dense(2, activation='linear')
     ])
-    # final_model.compile(loss='mse', optimizer=final_optimizer)
-    final_model.fit(train_input, train_output, epochs=final_params['epochs'], batch_size=final_params['batch_size'],
-                    verbose=0)
+    final_model.compile(loss='mse', optimizer=final_optimizer)
+
+    final_model.fit(
+        train_input, train_output,
+        epochs=final_params['epochs'],
+        batch_size=final_params['batch_size'],
+        verbose=0
+    )
 
     predictions = final_model.predict(test_input)
     metrics = f.calculate_metrics(test_output, predictions)
 
+    # Salvez cei mai buni hiperparametri
+    hyperparam_data = {
+        "method": "bayesian",
+        "best_hyperparameters": final_params
+    }
+
+    with open(save_path, "w") as f_out:
+        json.dump(hyperparam_data, f_out, indent=4)
+
+    print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
+
     return metrics, final_params
+
 
 def neural_network_from_zero(train_input, train_output, test_input, test_output):
     import neural_network_functions as nf
@@ -593,25 +643,25 @@ def neural_network_from_zero(train_input, train_output, test_input, test_output)
     return mse, mae, rmse, r2
 
 
-def optimized_neural_network_from_zero_grid_search(train_input, train_output, test_input, test_output):
+def optimized_neural_network_from_zero_grid_search(train_input, train_output, test_input, test_output,
+                                                   save_path="best_hyperparameters_grid_search.json"):
     import neural_network_functions as nf
     from sklearn.model_selection import ParameterGrid, KFold
     import numpy as np
 
     param_grid = {
-        'neuronsHL': [3, 5, 15, 25],
-        'LR': [0.001, 0.01, 0.02, 0.1],
-        'nrEpoci': [50, 100, 200, 300]
+        'neuronsHL': [3, 5, 15],
+        'LR': [0.001, 0.01, 0.02],
+        'nrEpoci': [25, 50, 100]
     }
 
     best_score = np.inf
     best_params = {}
 
     for params in ParameterGrid(param_grid):
-
         kf = KFold(n_splits=5)
         fold_scores = []
-
+        i = 1
         for train_idx, val_idx in kf.split(train_input):
             X_train, X_val = train_input[train_idx], train_input[val_idx]
             y_train, y_val = train_output[train_idx], train_output[val_idx]
@@ -625,6 +675,8 @@ def optimized_neural_network_from_zero_grid_search(train_input, train_output, te
             )
 
             mse, _, _, _ = nf.testare(X_val, y_val, HL, OUT)
+            print(f"mse combinatia cu numarul {i}: {mse}")
+            i += 1
             fold_scores.append(mse)
 
         avg_mse = np.mean(fold_scores)
@@ -633,25 +685,22 @@ def optimized_neural_network_from_zero_grid_search(train_input, train_output, te
             best_score = avg_mse
             best_params = params
 
-    HL, OUT, _ = nf.antrenare(
-        neuronsHL=best_params['neuronsHL'],
-        LR=best_params['LR'],
-        nrEpoci=best_params['nrEpoci'],
-        train_input=train_input,
-        train_output=train_output
-    )
+    # Salvează DOAR hiperparametrii cei mai buni
+    hyperparam_data = {
+        "method": "grid_search",
+        "best_hyperparameters": best_params
+    }
 
-    mse, mae, rmse, r2 = nf.testare(test_input, test_output, HL, OUT)
+    with open(save_path, "w") as f:
+        json.dump(hyperparam_data, f, indent=4)
 
-    print("Mean Squared Error (MSE):", mse)
-    print("Mean Absolute Error (MAE):", mae)
-    print("Root Mean Squared Error (RMSE):", rmse)
-    print("R^2 Score:", r2)
+    print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
 
-    return mse, mae, rmse, r2
+    return best_params
 
 
-def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_input, test_output):
+def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_input, test_output,
+                                                save_path="best_hyperparameters_bayesian.json"):
     import neural_network_functions as nf
     from bayes_opt import BayesianOptimization
 
@@ -692,20 +741,18 @@ def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_
         'nrEpoci': int(round(best_params['nrEpoci']))
     }
 
-    HL, OUT, _ = nf.antrenare(
-        train_input=train_input,
-        train_output=train_output,
-        **best_params
-    )
+    # Salvează DOAR hiperparametrii cei mai buni
+    hyperparam_data = {
+        "method": "bayesian",
+        "best_hyperparameters": best_params
+    }
 
-    mse, mae, rmse, r2 = nf.testare(test_input, test_output, HL, OUT)
+    with open(save_path, "w") as f:
+        json.dump(hyperparam_data, f, indent=4)
 
-    print("Mean Squared Error (MSE):", mse)
-    print("Mean Absolute Error (MAE):", mae)
-    print("Root Mean Squared Error (RMSE):", rmse)
-    print("R^2 Score:", r2)
+    print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
 
-    return mse, mae, rmse, r2
+    return best_params
 
 
 def gradient_boosting(train_input, train_output, test_input, test_output):
@@ -821,6 +868,16 @@ def decision_tree(train_input, train_output, test_input, test_output, max_depth)
     predictions = regr.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
+def decision_tree_features_importance(train_input, train_output, test_input, test_output,max_depth, feature_names):
+    regr = DecisionTreeRegressor(max_depth=max_depth)
+    regr.fit(train_input, train_output)
+    importance = regr.feature_importances_
+    plt.bar(range(train_input.shape[1]), importance)
+    plt.xticks(range(train_input.shape[1]), feature_names, rotation=90)
+    plt.title('Feature Importances - Decision Tree')
+    plt.show()
+    predictions = regr.predict(test_input)
+    return f.calculate_metrics(test_output, predictions)
 
 def optimized_decision_tree_grid_search(train_input, train_output, test_input, test_output):
     dt = DecisionTreeRegressor(random_state=42)
