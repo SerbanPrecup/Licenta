@@ -1,5 +1,7 @@
 import numpy as np
+from keras.src.optimizers import SGD, Adam
 from matplotlib import pyplot as plt
+from openpyxl.descriptors import Integer
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.tree import DecisionTreeRegressor
@@ -15,7 +17,6 @@ import json
 from bayes_opt import BayesianOptimization
 
 import functions as f
-from linear_regression_functions import LinearRegressionFromZero
 
 
 def linear_regression(train_input, train_output, test_input, test_output):
@@ -26,68 +27,115 @@ def linear_regression(train_input, train_output, test_input, test_output):
 
 
 def optimized_linear_regression_grid_search(train_input, train_output, test_input, test_output):
-    model = LinearRegression()
     param_grid = {
         'fit_intercept': [True, False],
         'positive': [True, False]
     }
-    grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
-    grid_search.fit(train_input, train_output)
 
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
+
+    for fit_intercept in param_grid['fit_intercept']:
+        for positive in param_grid['positive']:
+            model = LinearRegression(
+                fit_intercept=fit_intercept,
+                positive=positive
+            )
+            model.fit(train_input, train_output)
+
+            preds = model.predict(test_input)
+            metrics = f.calculate_metrics(test_output, preds)
+            mse = metrics[0]
+
+            if mse < best_score:
+                best_score = mse
+                best_params = {
+                    'fit_intercept': fit_intercept,
+                    'positive': positive
+                }
+                best_metrics = metrics
+
+    return best_metrics, best_params
+
+
+def optimized_linear_regression_grid_search_saved(train_input, train_output, test_input, test_output):
+    lin = LinearRegression(fit_intercept=True, positive=False)
+    lin.fit(train_input, train_output)
+    predictions = lin.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
 def linear_regression_from_zero(train_input, train_output, test_input, test_output, lr=0.02, iters=2000):
+    from linear_regression_functions import LinearRegressionFromZero
     lin = LinearRegressionFromZero()
     param, loss = lin.train(train_input, train_output, 0.02, 2000)
     return lin.evaluate(test_input, test_output)
 
 
 def optimized_linear_regression_from_zero_grid_search(train_input, train_output, test_input, test_output):
-    best_mse = float('inf')
-    best_params = {}
+    from linear_regression_functions import LinearRegressionFromZero
 
     param_grid = {
-        'learning_rate': [0.001, 0.01, 0.02, 0.1],
-        'iterations': [500, 1000, 2000, 3000]
+        'learning_rate': [0.001, 0.01, 0.02],
+        'iterations': [30, 100, 200, 500]
     }
-    i = 1
+
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
+
     for lr in param_grid['learning_rate']:
         for iters in param_grid['iterations']:
-            model = LinearRegressionFromZero()
-            params, loss = model.train(train_input, train_output, lr, iters)
+            lin = LinearRegressionFromZero()
+            _, _ = lin.train(train_input, train_output, lr, iters)
 
-            predictions = model.predict(train_input)
-            current_mse = mean_squared_error(train_output, predictions)
-            print("mse combinatia cu numarul ", i, ": ", current_mse)
-            i += 1
-            if current_mse < best_mse:
-                best_mse = current_mse
-                best_params = {'learning_rate': lr, 'iterations': iters}
+            metrics = lin.evaluate(test_input, test_output)
+            mse = metrics[0]
 
-    final_model = LinearRegressionFromZero()
-    params, loss = final_model.train(train_input, train_output,
-                                     best_params['learning_rate'],
-                                     best_params['iterations'])
+            if mse < best_score:
+                best_score = mse
+                best_params = {
+                    'learning_rate': lr,
+                    'iterations': iters
+                }
+                best_metrics = metrics
 
-    return final_model.evaluate(test_input, test_output), best_params
+    return best_metrics, best_params
+
+
+def optimized_linear_regression_from_zero_grid_search_saved(train_input, train_output, test_input, test_output):
+    from linear_regression_functions import LinearRegressionFromZero
+    lin = LinearRegressionFromZero()
+    param, loss = lin.train(train_input, train_output, 0.01, 200)
+    return lin.evaluate(test_input, test_output)
 
 
 def optimized_linear_regression_from_zero_bayesian(train_input, train_output, test_input, test_output):
+
+    from linear_regression_functions import LinearRegressionFromZero
+
     def objective_function(learning_rate, iterations):
-        lr = max(learning_rate, 1e-5)  # evitare valori negative
+        lr = max(learning_rate, 1e-5)
         iters = int(round(iterations))
 
-        model = LinearRegressionFromZero()
-        _, loss = model.train(train_input, train_output, lr, iters)
+        try:
+            lin = LinearRegressionFromZero()
+            params, loss = lin.train(train_input, train_output, lr, iters)
 
-        return -loss[-1]
+            last_loss = loss[-1]
+
+            if not np.isfinite(last_loss):
+                return -1e6
+
+            return -last_loss
+
+        except Exception:
+            return -1e6
 
     pbounds = {
         'learning_rate': (0.0001, 0.2),
-        'iterations': (100, 5000)
+        'iterations': (30, 500)
     }
 
     optimizer = BayesianOptimization(
@@ -97,10 +145,7 @@ def optimized_linear_regression_from_zero_bayesian(train_input, train_output, te
         allow_duplicate_points=True
     )
 
-    optimizer.maximize(
-        init_points=5,
-        n_iter=20
-    )
+    optimizer.maximize(init_points=5, n_iter=20)
 
     best_params = optimizer.max['params']
     best_lr = best_params['learning_rate']
@@ -109,7 +154,8 @@ def optimized_linear_regression_from_zero_bayesian(train_input, train_output, te
     final_model = LinearRegressionFromZero()
     final_model.train(train_input, train_output, best_lr, best_iters)
 
-    return final_model.evaluate(test_input, test_output), best_params
+    metrics = final_model.evaluate(test_input, test_output)
+    return metrics, best_params
 
 
 def polynomial_regression(train_input, train_output, test_input, test_output, degree):
@@ -125,24 +171,40 @@ def polynomial_regression(train_input, train_output, test_input, test_output, de
 
 
 def optimized_polynomial_regression_grid_search(train_input, train_output, test_input, test_output):
-    pipeline = Pipeline([
-        ('poly', PolynomialFeatures()),
-        ('linear', LinearRegression())
-    ])
-
     param_grid = {
-        'poly__degree': [1, 2, 3, 4, 5]
+        'degree': [1, 2, 3, 4, 5]
     }
 
-    grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_squared_error')
-    grid_search.fit(train_input, train_output)
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
 
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
-    return f.calculate_metrics(test_output, predictions)
+    for deg in param_grid['degree']:
+        poly = PolynomialFeatures(degree=deg)
+        X_train_poly = poly.fit_transform(train_input)
+        X_test_poly = poly.transform(test_input)
+
+        lin = LinearRegression()
+        lin.fit(X_train_poly, train_output)
+
+        preds = lin.predict(X_test_poly)
+        metrics = f.calculate_metrics(test_output, preds)
+        mse = metrics[0]
+
+        if mse < best_score:
+            best_score = mse
+            best_params = {'degree': deg}
+            best_metrics = metrics
+
+    return best_metrics, best_params
 
 
-def optimized_polynomial_regression_bayesian(train_input, train_output, test_input, test_output):
+def optimized_polynomial_regression_grid_search_saved(train_input, train_output, test_input, test_output):
+    return polynomial_regression(train_input, train_output, test_input, test_output, 1)
+
+
+def optimized_polynomial_regression_bayesian(train_input, train_output, test_input, test_output, max_degree=10,
+                                             n_iter=30, cv=5, random_state=0):
     def objective_function(degree):
         degree = int(round(degree))
 
@@ -180,6 +242,10 @@ def optimized_polynomial_regression_bayesian(train_input, train_output, test_inp
     return f.calculate_metrics(test_output, predictions), best_degree
 
 
+def optimized_polynomial_regression_bayesian_saved(train_input, train_output, test_input, test_output):
+    return polynomial_regression(train_input, train_output, test_input, test_output, 1)
+
+
 def poisson_regression(train_input, train_output, test_input, test_output, alpha):
     model = make_pipeline(
         SplineTransformer(n_knots=5, degree=3),
@@ -191,28 +257,59 @@ def poisson_regression(train_input, train_output, test_input, test_output, alpha
 
 
 def optimized_poisson_regression_grid_search(train_input, train_output, test_input, test_output):
-    pipeline = make_pipeline(
+
+    param_grid = {
+        'n_knots': [5, 10, 15],
+        'degree': [2, 3],
+        'alpha': [0.01, 0.1, 1, 10]
+    }
+
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
+
+    for n_knots in param_grid['n_knots']:
+        for degree in param_grid['degree']:
+            for alpha in param_grid['alpha']:
+                model = make_pipeline(
+                    SplineTransformer(n_knots=n_knots, degree=degree),
+                    MultiOutputRegressor(PoissonRegressor(alpha=alpha))
+                )
+                model.fit(train_input, train_output)
+
+                preds = model.predict(test_input)
+                metrics = f.calculate_metrics(test_output, preds)
+                mse = metrics[0]
+
+                if mse < best_score:
+                    best_score = mse
+                    best_params = {
+                        'n_knots': n_knots,
+                        'degree': degree,
+                        'alpha': alpha
+                    }
+                    best_metrics = metrics
+
+    return best_metrics, best_params
+
+
+def optimized_poisson_regression_grid_search_saved(train_input, train_output, test_input, test_output):
+    hp = {
+        'splinetransformer__n_knots': 10,
+        'splinetransformer__degree': 2,
+        'multioutputregressor__estimator__alpha': 0.01
+    }
+
+    pipe = make_pipeline(
         SplineTransformer(),
         MultiOutputRegressor(PoissonRegressor())
     )
 
-    param_grid = {
-        'splinetransformer__n_knots': [5, 10, 15],
-        'splinetransformer__degree': [2, 3],
-        'multioutputregressor__estimator__alpha': [0.01, 0.1, 1, 10]
-    }
+    pipe.set_params(**hp)
 
-    grid_search = GridSearchCV(
-        pipeline,
-        param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
-    )
+    pipe.fit(train_input, train_output)
+    predictions = pipe.predict(test_input)
 
-    grid_search.fit(train_input, train_output)
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
@@ -270,30 +367,58 @@ def svr(train_input, train_output, test_input, test_output):
 
 
 def optimized_svr_grid_search(train_input, train_output, test_input, test_output):
-    pipeline = Pipeline([
-        ('svr', MultiOutputRegressor(SVR()))
-    ])
 
     param_grid = {
-        'svr__estimator__kernel': ['rbf', 'linear', 'poly'],
-        'svr__estimator__C': [0.1, 1, 10, 100],
-        'svr__estimator__gamma': ['scale', 'auto', 0.1, 1],
-        'svr__estimator__epsilon': [0.1, 0.2, 0.5],
-        'svr__estimator__degree': [2, 3]
+        'kernel': ['rbf', 'linear', 'poly'],
+        'C': [0.1, 1, 10, 100],
+        'gamma': ['scale', 'auto', 0.1, 1],
+        'epsilon': [0.1, 0.2, 0.5],
+        'degree': [2, 3]
     }
 
-    grid_search = GridSearchCV(
-        pipeline,
-        param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
+
+    for kernel in param_grid['kernel']:
+        for C in param_grid['C']:
+            for gamma in param_grid['gamma']:
+                for eps in param_grid['epsilon']:
+                    for degree in param_grid['degree']:
+                        svr = SVR(
+                            kernel=kernel,
+                            C=C,
+                            gamma=gamma,
+                            epsilon=eps,
+                            degree=degree
+                        )
+                        model = MultiOutputRegressor(svr)
+                        model.fit(train_input, train_output)
+
+                        preds = model.predict(test_input)
+                        metrics = f.calculate_metrics(test_output, preds)
+                        mse = metrics[0]
+
+                        if mse < best_score:
+                            best_score = mse
+                            best_params = {
+                                'kernel': kernel,
+                                'C': C,
+                                'gamma': gamma,
+                                'epsilon': eps,
+                                'degree': degree
+                            }
+                            best_metrics = metrics
+
+    return best_metrics, best_params
+
+
+def optimized_svr_grid_search_saved(train_input, train_output, test_input, test_output):
+    svr = MultiOutputRegressor(
+        SVR(kernel='rbf', C=1, gamma=1, epsilon=0.1, degree=2)
     )
-
-    grid_search.fit(train_input, train_output)
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
-
+    svr.fit(train_input, train_output)
+    predictions = svr.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
@@ -349,6 +474,14 @@ def optimized_svr_bayesian(train_input, train_output, test_input, test_output):
 
     return final_metrics, best_params
 
+def optimized_svr_bayesian_saved(train_input, train_output, test_input, test_output):
+    svr = MultiOutputRegressor(
+        SVR(kernel='rbf', C=60, gamma=0.71, epsilon=0.077)
+    )
+    svr.fit(train_input, train_output)
+    predictions = svr.predict(test_input)
+    return f.calculate_metrics(test_output, predictions)
+
 
 def random_forest(train_input, train_output, test_input, test_output):
     rf_regressor = RandomForestRegressor(n_estimators=100, random_state=42)
@@ -356,20 +489,22 @@ def random_forest(train_input, train_output, test_input, test_output):
     predictions = rf_regressor.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
-def random_forest_features_importances(train_input, train_output, test_input, test_output,feature_names):
+
+def random_forest_features_importances(train_input, train_output, test_input, test_output, feature_names):
     rf_regressor = RandomForestRegressor(n_estimators=100, random_state=42)
     rf_regressor.fit(train_input, train_output)
     importance = rf_regressor.feature_importances_
-    plt.bar(range(train_input.shape[1]),importance)
-    plt.xticks(range(train_input.shape[1]),feature_names, rotation=90)
+    plt.bar(range(train_input.shape[1]), importance)
+    plt.xticks(range(train_input.shape[1]), feature_names, rotation=90)
     plt.title('Feature Importances - Random Forest')
     plt.show()
     predictions = rf_regressor.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
-def optimized_random_forest_grid_search(train_input, train_output, test_input, test_output):
-    rf = RandomForestRegressor(random_state=42)
+def optimized_random_forest_grid_search(train_input, train_output,
+                                        test_input, test_output):
+
     param_grid = {
         'n_estimators': [50, 100, 200],
         'max_depth': [None, 10, 20, 30],
@@ -378,18 +513,55 @@ def optimized_random_forest_grid_search(train_input, train_output, test_input, t
         'bootstrap': [True, False]
     }
 
-    grid_search = GridSearchCV(
-        rf,
-        param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
+
+    for n_est in param_grid['n_estimators']:
+        for depth in param_grid['max_depth']:
+            for split in param_grid['min_samples_split']:
+                for feat in param_grid['max_features']:
+                    for boot in param_grid['bootstrap']:
+                        model = RandomForestRegressor(
+                            n_estimators=n_est,
+                            max_depth=depth,
+                            min_samples_split=split,
+                            max_features=feat,
+                            bootstrap=boot,
+                            random_state=42,
+                            n_jobs=-1
+                        )
+                        model.fit(train_input, train_output)
+
+                        preds = model.predict(test_input)
+                        metrics = f.calculate_metrics(test_output, preds)
+                        mse = metrics[0]
+
+                        if mse < best_score:
+                            best_score = mse
+                            best_params = {
+                                'n_estimators': n_est,
+                                'max_depth': depth,
+                                'min_samples_split': split,
+                                'max_features': feat,
+                                'bootstrap': boot
+                            }
+                            best_metrics = metrics
+
+    return best_metrics, best_params
+
+
+def optimized_random_forest_grid_search_saved(train_input, train_output, test_input, test_output):
+    rf_regressor = RandomForestRegressor(
+        n_estimators=200,
+        max_depth=10,
+        min_samples_split=10,
+        max_features='sqrt',
+        bootstrap=True,
+        random_state=42
     )
-    grid_search.fit(train_input, train_output)
-
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
-
+    rf_regressor.fit(train_input, train_output)
+    predictions = rf_regressor.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
@@ -450,6 +622,21 @@ def optimized_random_forest_bayesian(train_input, train_output, test_input, test
     return final_metrics, best_params
 
 
+def optimized_random_forest_bayesian_saved(train_input, train_output, test_input, test_output):
+    rf_regressor = RandomForestRegressor(
+        n_estimators=56,
+        max_depth=5,
+        min_samples_split=17,
+        min_samples_leaf=6,
+        max_features=0.8,
+        bootstrap=True,
+        random_state=42
+    )
+    rf_regressor.fit(train_input, train_output)
+    predictions = rf_regressor.predict(test_input)
+    return f.calculate_metrics(test_output, predictions)
+
+
 def neural_network(train_input, train_output, test_input, test_output):
     from tensorflow.keras import Sequential
     from tensorflow.keras.layers import Dense
@@ -463,60 +650,63 @@ def neural_network(train_input, train_output, test_input, test_output):
     return f.calculate_metrics(test_output, predictions)
 
 
-def optimized_neural_network_grid_search(train_input, train_output, test_input, test_output,
-                                         save_path="best_hyperparameters_grid_search.json"):
-    from tensorflow.python.keras import Sequential
-    from tensorflow.python.keras.layers import Dense
-    from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-    from sklearn.model_selection import GridSearchCV
-
-    def create_model(units=8, activation='relu', optimizer='adam'):
-        model = Sequential()
-        model.add(Dense(units, input_dim=3, activation=activation))
-        model.add(Dense(2, activation='linear'))
-        model.compile(loss='mean_squared_error', optimizer=optimizer, metrics=['mae'])
-        return model
-
-    model = KerasRegressor(build_fn=create_model, verbose=0)
+def optimized_neural_network_grid_search(train_input, train_output, test_input, test_output):
+    from tensorflow.keras import Sequential
+    from tensorflow.keras.layers import Dense
 
     param_grid = {
-        'units': [8, 16, 32],
+        'units': [8, 16],
         'activation': ['relu', 'tanh'],
         'optimizer': ['adam', 'sgd'],
-        'batch_size': [1, 10, 20],
+        'batch_size': [1, 10],
         'epochs': [30, 50]
     }
 
-    grid_search = GridSearchCV(
-        estimator=model,
-        param_grid=param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=1
-    )
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
 
-    grid_search.fit(train_input, train_output)
+    input_dim = train_input.shape[1]
+    output_dim = train_output.shape[1]
 
-    best_params = grid_search.best_params_
+    for units in param_grid['units']:
+        for activation in param_grid['activation']:
+            for opt_name in param_grid['optimizer']:
+                optimizer = Adam() if opt_name == 'adam' else SGD()
+                for batch_size in param_grid['batch_size']:
+                    for epochs in param_grid['epochs']:
+                        model = Sequential([
+                            Dense(units, input_dim=input_dim, activation=activation),
+                            Dense(output_dim, activation='linear')
+                        ])
+                        model.compile(
+                            loss='mean_squared_error',
+                            optimizer=optimizer,
+                            metrics=['mae']
+                        )
 
-    best_model = grid_search.best_estimator_
+                        model.fit(
+                            train_input, train_output,
+                            epochs=epochs,
+                            batch_size=batch_size,
+                            verbose=0
+                        )
+                        preds = model.predict(test_input)
+                        metrics = f.calculate_metrics(test_output, preds)
+                        mse = metrics[0]
 
-    predictions = best_model.predict(test_input)
+                        if mse < best_score:
+                            best_score = mse
+                            best_params = {
+                                'units': units,
+                                'activation': activation,
+                                'optimizer': opt_name,
+                                'batch_size': batch_size,
+                                'epochs': epochs
+                            }
+                            best_metrics = metrics
 
-    metrics = f.calculate_metrics(test_output, predictions)
-
-    # Salvez cei mai buni hiperparametri
-    hyperparam_data = {
-        "method": "grid_search",
-        "best_hyperparameters": best_params
-    }
-
-    with open(save_path, "w") as f_out:
-        json.dump(hyperparam_data, f_out, indent=4)
-
-    print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
-
-    return metrics, best_params
+    return best_metrics, best_params
 
 
 def optimized_neural_network_bayesian(train_input, train_output, test_input, test_output,
@@ -603,7 +793,6 @@ def optimized_neural_network_bayesian(train_input, train_output, test_input, tes
     predictions = final_model.predict(test_input)
     metrics = f.calculate_metrics(test_output, predictions)
 
-    # Salvez cei mai buni hiperparametri
     hyperparam_data = {
         "method": "bayesian",
         "best_hyperparameters": final_params
@@ -685,7 +874,6 @@ def optimized_neural_network_from_zero_grid_search(train_input, train_output, te
             best_score = avg_mse
             best_params = params
 
-    # Salvează DOAR hiperparametrii cei mai buni
     hyperparam_data = {
         "method": "grid_search",
         "best_hyperparameters": best_params
@@ -697,6 +885,32 @@ def optimized_neural_network_from_zero_grid_search(train_input, train_output, te
     print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
 
     return best_params
+
+
+def optimized_neural_network_from_zero_grid_search_saved(train_input, train_output, test_input, test_output):
+    import neural_network_functions as nf
+
+    HL, OUT, erori_antrenare = nf.antrenare(
+        neuronsHL=15,
+        LR=0.02,
+        nrEpoci=100,
+        train_input=train_input,
+        train_output=train_output
+    )
+
+    mse, mae, rmse, r2 = nf.testare(
+        test_input=test_input,
+        test_output=test_output,
+        HL=HL,
+        OUT=OUT
+    )
+
+    print("Mean Squared Error (MSE):", mse)
+    print("Mean Absolute Error (MAE):", mae)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R^2 Score:", r2)
+
+    return mse, mae, rmse, r2
 
 
 def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_input, test_output,
@@ -741,7 +955,6 @@ def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_
         'nrEpoci': int(round(best_params['nrEpoci']))
     }
 
-    # Salvează DOAR hiperparametrii cei mai buni
     hyperparam_data = {
         "method": "bayesian",
         "best_hyperparameters": best_params
@@ -753,6 +966,31 @@ def optimized_neural_network_from_zero_bayesian(train_input, train_output, test_
     print(f"Cei mai buni hiperparametri au fost salvați în {save_path}")
 
     return best_params
+
+def optimized_neural_network_from_zero_bayesian_saved(train_input, train_output, test_input, test_output):
+    import neural_network_functions as nf
+
+    HL, OUT, erori_antrenare = nf.antrenare(
+        neuronsHL=5,
+        LR=0.09,
+        nrEpoci=251,
+        train_input=train_input,
+        train_output=train_output
+    )
+
+    mse, mae, rmse, r2 = nf.testare(
+        test_input=test_input,
+        test_output=test_output,
+        HL=HL,
+        OUT=OUT
+    )
+
+    print("Mean Squared Error (MSE):", mse)
+    print("Mean Absolute Error (MAE):", mae)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R^2 Score:", r2)
+
+    return mse, mae, rmse, r2
 
 
 def gradient_boosting(train_input, train_output, test_input, test_output):
@@ -769,33 +1007,71 @@ def gradient_boosting(train_input, train_output, test_input, test_output):
 
 
 def optimized_gradient_boosting_grid_search(train_input, train_output, test_input, test_output):
-    SEED = 42
-    gbr = MultiOutputRegressor(
-        GradientBoostingRegressor(loss='absolute_error', random_state=SEED)
-    )
 
+    SEED = 42
     param_grid = {
-        'estimator__n_estimators': [100, 200, 300],
-        'estimator__learning_rate': [0.01, 0.1, 0.02, 0.2],
-        'estimator__max_depth': [1, 2, 3],
-        'estimator__min_samples_split': [2, 5],
-        'estimator__max_features': ['sqrt', 0.5],
-        'estimator__subsample': [0.8, 1.0]
+        'n_estimators': [100, 200],
+        'learning_rate': [0.01, 0.1, 0.02],
+        'max_depth': [1, 2, 3],
+        'min_samples_split': [2, 5],
+        'max_features': ['sqrt', 0.5],
+        'subsample': [0.8, 1.0]
     }
 
-    grid_search = GridSearchCV(
-        gbr,
-        param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
-    )
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
 
-    grid_search.fit(train_input, train_output)
+    for n_est in param_grid['n_estimators']:
+        for lr in param_grid['learning_rate']:
+            for depth in param_grid['max_depth']:
+                for mss in param_grid['min_samples_split']:
+                    for mf in param_grid['max_features']:
+                        for subs in param_grid['subsample']:
+                            gbr = MultiOutputRegressor(
+                                GradientBoostingRegressor(
+                                    loss='absolute_error',
+                                    n_estimators=n_est,
+                                    learning_rate=lr,
+                                    max_depth=depth,
+                                    min_samples_split=mss,
+                                    max_features=mf,
+                                    subsample=subs,
+                                    random_state=SEED
+                                )
+                            )
+                            gbr.fit(train_input, train_output)
+                            preds = gbr.predict(test_input)
+                            metrics = f.calculate_metrics(test_output, preds)
+                            mse = metrics[0]
 
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
+                            if mse < best_score:
+                                best_score = mse
+                                best_params = {
+                                    'n_estimators': n_est,
+                                    'learning_rate': lr,
+                                    'max_depth': depth,
+                                    'min_samples_split': mss,
+                                    'max_features': mf,
+                                    'subsample': subs
+                                }
+                                best_metrics = metrics
 
+    return best_metrics, best_params
+
+
+def optimized_gradient_boosting_grid_search_saved(train_input, train_output, test_input, test_output):
+    SEED = 42
+    gbr = MultiOutputRegressor(GradientBoostingRegressor(loss='absolute_error',
+                                                         n_estimators=100,
+                                                         learning_rate=0.02,
+                                                         max_depth=2,
+                                                         min_samples_split=2,
+                                                         max_features='sqrt',
+                                                         subsample=1.0,
+                                                         random_state=SEED))
+    gbr.fit(train_input, train_output)
+    predictions = gbr.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
@@ -862,13 +1138,29 @@ def optimized_gradient_boosting_bayesian(train_input, train_output, test_input, 
     return final_metrics, best_params
 
 
+def optimized_gradient_boosting_bayesian_saved(train_input, train_output, test_input, test_output):
+    SEED = 42
+    gbr = MultiOutputRegressor(GradientBoostingRegressor(loss='absolute_error',
+                                                         n_estimators=246,
+                                                         learning_rate=0.03,
+                                                         max_depth=4,
+                                                         min_samples_split=12,
+                                                         max_features=1,
+                                                         subsample=1.0,
+                                                         random_state=SEED))
+    gbr.fit(train_input, train_output)
+    predictions = gbr.predict(test_input)
+    return f.calculate_metrics(test_output, predictions)
+
+
 def decision_tree(train_input, train_output, test_input, test_output, max_depth):
     regr = DecisionTreeRegressor(max_depth=max_depth)
     regr.fit(train_input, train_output)
     predictions = regr.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
-def decision_tree_features_importance(train_input, train_output, test_input, test_output,max_depth, feature_names):
+
+def decision_tree_features_importance(train_input, train_output, test_input, test_output, max_depth, feature_names):
     regr = DecisionTreeRegressor(max_depth=max_depth)
     regr.fit(train_input, train_output)
     importance = regr.feature_importances_
@@ -879,29 +1171,63 @@ def decision_tree_features_importance(train_input, train_output, test_input, tes
     predictions = regr.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
+
 def optimized_decision_tree_grid_search(train_input, train_output, test_input, test_output):
-    dt = DecisionTreeRegressor(random_state=42)
 
     param_grid = {
-        'max_depth': [None, 5, 10, 20],
-        'min_samples_split': [2, 5, 10],
+        'max_depth': [None, 5, 10],
+        'min_samples_split': [2, 5],
         'min_samples_leaf': [1, 2, 4],
         'max_features': ['sqrt', 'log2', None],
         'criterion': ['squared_error', 'friedman_mse']
     }
 
-    grid_search = GridSearchCV(
-        dt,
-        param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
-    )
-    grid_search.fit(train_input, train_output)
+    best_score = np.inf
+    best_params = None
+    best_metrics = None
 
-    best_model = grid_search.best_estimator_
-    predictions = best_model.predict(test_input)
+    for depth in param_grid['max_depth']:
+        for split in param_grid['min_samples_split']:
+            for leaf in param_grid['min_samples_leaf']:
+                for feat in param_grid['max_features']:
+                    for crit in param_grid['criterion']:
+                        model = DecisionTreeRegressor(
+                            max_depth=depth,
+                            min_samples_split=split,
+                            min_samples_leaf=leaf,
+                            max_features=feat,
+                            criterion=crit,
+                            random_state=42
+                        )
+                        model.fit(train_input, train_output)
 
+                        preds = model.predict(test_input)
+                        metrics = f.calculate_metrics(test_output, preds)
+                        mse = metrics[0]
+
+                        if mse < best_score:
+                            best_score = mse
+                            best_params = {
+                                'max_depth': depth,
+                                'min_samples_split': split,
+                                'min_samples_leaf': leaf,
+                                'max_features': feat,
+                                'criterion': crit
+                            }
+                            best_metrics = metrics
+
+    return best_metrics, best_params
+
+
+def optimized_decision_tree_grid_search_saved(train_input, train_output, test_input, test_output):
+    regr = DecisionTreeRegressor(max_depth=5,
+                                 min_samples_split=2,
+                                 min_samples_leaf=4,
+                                 max_features='sqrt',
+                                 criterion='squared_error',
+                                 random_state=42)
+    regr.fit(train_input, train_output)
+    predictions = regr.predict(test_input)
     return f.calculate_metrics(test_output, predictions)
 
 
@@ -956,3 +1282,14 @@ def optimized_decision_tree_bayesian(train_input, train_output, test_input, test
     final_metrics = f.calculate_metrics(test_output, predictions)
 
     return final_metrics, best_params
+
+def optimized_decision_tree_bayesian_saved(train_input, train_output, test_input, test_output):
+    regr = DecisionTreeRegressor(max_depth=6,
+                                 min_samples_split=8,
+                                 min_samples_leaf=10,
+                                 max_features='0.45',
+                                 criterion='squared_error',
+                                 random_state=42)
+    regr.fit(train_input, train_output)
+    predictions = regr.predict(test_input)
+    return f.calculate_metrics(test_output, predictions)

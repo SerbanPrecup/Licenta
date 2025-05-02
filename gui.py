@@ -159,20 +159,19 @@ class Application(tk.Tk):
             else:
                 train_in, train_out, test_in, test_out = train_input, train_output, test_input, test_output
 
+            params = {}
             if algorithm == 'Regresie liniara':
                 if tuning_method == 'Grid Search':
-                    metrics, params = alg.optimized_linear_regression_from_zero_grid_search(train_in, train_out,
+                    metrics, params = alg.optimized_linear_regression_grid_search(train_in, train_out,
                                                                                             test_in, test_out)
-                elif tuning_method == 'Bayesian Optimization':
-                    metrics, params = alg.optimized_linear_regression_from_zero_bayesian(train_in, train_out, test_in,
-                                                                                         test_out)
                 else:
                     metrics = alg.linear_regression(train_in, train_out, test_in, test_out)
 
             elif algorithm == 'Regresie liniara (from zero)':
                 if tuning_method == 'Grid Search':
-                    metrics, _ = alg.optimized_linear_regression_from_zero_grid_search(train_in, train_out, test_in,
-                                                                                       test_out)
+                    metrics, params = alg.optimized_linear_regression_from_zero_grid_search(train_in, train_out,
+                                                                                            test_in,
+                                                                                            test_out)
                 else:
                     metrics = alg.linear_regression_from_zero(train_in, train_out, test_in, test_out)
 
@@ -180,7 +179,8 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_polynomial_regression_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_polynomial_regression_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_polynomial_regression_bayesian(train_in, train_out, test_in,
+                                                                                   test_out)
                 else:
                     metrics = alg.polynomial_regression(train_in, train_out, test_in, test_out, degree=2)
 
@@ -188,7 +188,7 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_poisson_regression_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_poisson_regression_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_poisson_regression_bayesian(train_in, train_out, test_in, test_out)
                 else:
                     metrics = alg.poisson_regression(train_in, train_out, test_in, test_out, alpha=0.01)
 
@@ -196,7 +196,7 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_svr_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_svr_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_svr_bayesian(train_in, train_out, test_in, test_out)
                 else:
                     metrics = alg.svr(train_in, train_out, test_in, test_out)
 
@@ -204,15 +204,16 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_random_forest_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_random_forest_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_random_forest_bayesian(train_in, train_out, test_in, test_out)
                 else:
-                    metrics = alg.random_forest_features_importances(train_in, train_out, test_in, test_out,feature_names)
+                    metrics = alg.random_forest_features_importances(train_in, train_out, test_in, test_out,
+                                                                     feature_names)
 
             elif algorithm == 'Retea neuronala(Keras)':
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_neural_network_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_neural_network_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_neural_network_bayesian(train_in, train_out, test_in, test_out)
                 else:
                     metrics = alg.neural_network(train_in, train_out, test_in, test_out)
 
@@ -220,7 +221,8 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_neural_network_from_zero_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_neural_network_from_zero_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_neural_network_from_zero_bayesian(train_in, train_out, test_in,
+                                                                                      test_out)
                 else:
                     metrics = alg.neural_network_from_zero(train_in, train_out, test_in, test_out)
 
@@ -228,7 +230,7 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_gradient_boosting_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_gradient_boosting_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_gradient_boosting_bayesian(train_in, train_out, test_in, test_out)
                 else:
                     metrics = alg.gradient_boosting(train_in, train_out, test_in, test_out)
 
@@ -236,20 +238,21 @@ class Application(tk.Tk):
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_decision_tree_grid_search(train_in, train_out, test_in, test_out)
                 elif tuning_method == 'Bayesian Optimization':
-                    metrics, _ = alg.optimized_decision_tree_bayesian(train_in, train_out, test_in, test_out)
+                    metrics, params = alg.optimized_decision_tree_bayesian(train_in, train_out, test_in, test_out)
                 else:
-                    metrics = alg.decision_tree_features_importance(train_in, train_out, test_in, test_out, max_depth=5, feature_names=feature_names)
+                    metrics = alg.decision_tree_features_importance(train_in, train_out, test_in, test_out, max_depth=5,
+                                                                    feature_names=feature_names)
             else:
                 messagebox.showerror("Eroare", "Algoritm necunoscut!")
                 return
 
             self.results_text.delete(1.0, tk.END)
             self.results_text.insert(tk.END, "Metrici de evaluare:\n\n")
-            self.results_text.insert(tk.END, f"MSE: {metrics[0]:}\n")
-            self.results_text.insert(tk.END, f"MAE: {metrics[1]:}\n")
-            self.results_text.insert(tk.END, f"RMSE: {metrics[2]:}\n")
-            self.results_text.insert(tk.END, f"R²: {metrics[3]:}\n")
-
+            self.results_text.insert(tk.END, f"{metrics:}\n")
+            # self.results_text.insert(tk.END, f"MAE: {metrics[1]:}\n")
+            # self.results_text.insert(tk.END, f"RMSE: {metrics[2]:}\n")
+            # self.results_text.insert(tk.END, f"R²: {metrics[3]:}\n")
+            self.results_text.insert(tk.END, f"Best Params: {params if params else '– niciun parametru tuning –'}\n")
         except Exception as e:
             messagebox.showerror("Eroare", f"A apărut o eroare: {str(e)}")
 
