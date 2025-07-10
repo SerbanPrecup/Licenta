@@ -161,10 +161,16 @@ class Application(tk.Tk):
                 mask = ~np.isnan(te_i).any(axis=1)
                 te_i, te_o = te_i[mask], te_o[mask]
 
-                datasets = {
-                    'MIN MAX': f.normalize_min_max(tr_i, tr_o, te_i, te_o),
-                    'STANDARD': f.normalize_standard(tr_i, tr_o, te_i, te_o)
-                }
+                if algo == 'Regresie Poisson':
+                    datasets = {
+                        'MIN MAX': f.normalize_min_max(tr_i, tr_o, te_i, te_o),
+                        'STANDARD': f.normalize_min_max(tr_i, tr_o, te_i, te_o)
+                    }
+                else:
+                    datasets = {
+                        'MIN MAX': f.normalize_min_max(tr_i, tr_o, te_i, te_o),
+                        'STANDARD': f.normalize_standard(tr_i, tr_o, te_i, te_o)
+                    }
 
                 for tune in tune_methods:
                     metrics_results = {}
@@ -193,7 +199,7 @@ class Application(tk.Tk):
 
                         elif algo == 'Regresie Poisson':
                             if tune == 'Grid Search':
-                                m = alg.optimized_poisson_regression_grid_search(ti, to, vi, vo)
+                                m, _ = alg.optimized_poisson_regression_grid_search(ti, to, vi, vo)
                             elif tune == 'Bayesian Optimization':
                                 m, _ = alg.optimized_poisson_regression_bayesian(ti, to, vi, vo)
                             else:
@@ -227,7 +233,7 @@ class Application(tk.Tk):
                             if tune == 'Grid Search':
                                 m = alg.optimized_neural_network_from_zero_grid_search_saved(ti, to, vi, vo)
                             elif tune == 'Bayesian Optimization':
-                                m, _ = alg.optimized_neural_network_from_zero_bayesian_saved(ti, to, vi, vo)
+                                m = alg.optimized_neural_network_from_zero_bayesian_saved(ti, to, vi, vo)
                             else:
                                 m = alg.neural_network_from_zero(ti, to, vi, vo)
 

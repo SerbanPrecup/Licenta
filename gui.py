@@ -45,7 +45,6 @@ class Application(tk.Tk):
                                            'Regresie Poisson',
                                            'SVR',
                                            'Random Forest',
-                                           'Retea neuronala(Keras)',
                                            'Retea neuronala(from zero)',
                                            'Gradient Boosting',
                                            'Arbore de decizie'
@@ -78,7 +77,7 @@ class Application(tk.Tk):
         self.combo_split.grid(row=0, column=5, padx=5, pady=5)
         self.combo_split.set('80-20')
 
-        self.btn_run = ttk.Button(self, text="Antrenează modelul", command=self.run_algorithm)
+        self.btn_run = ttk.Button(self, text="Start Train & Test", command=self.run_algorithm)
         self.btn_run.pack(pady=10)
 
         results_frame = ttk.LabelFrame(self, text="Rezultate")
@@ -125,7 +124,6 @@ class Application(tk.Tk):
             'Regresie Poisson': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'SVR': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Random Forest': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
-            'Retea neuronala(Keras)': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Retea neuronala(from zero)': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Gradient Boosting': ['Niciuna', 'Grid Search', 'Bayesian Optimization'],
             'Arbore de decizie': ['Niciuna', 'Grid Search', 'Bayesian Optimization']
@@ -209,14 +207,6 @@ class Application(tk.Tk):
                     metrics = alg.random_forest_features_importances(train_in, train_out, test_in, test_out,
                                                                      feature_names)
 
-            elif algorithm == 'Retea neuronala(Keras)':
-                if tuning_method == 'Grid Search':
-                    metrics = alg.optimized_neural_network_grid_search(train_in, train_out, test_in, test_out)
-                elif tuning_method == 'Bayesian Optimization':
-                    metrics, params = alg.optimized_neural_network_bayesian(train_in, train_out, test_in, test_out)
-                else:
-                    metrics = alg.neural_network(train_in, train_out, test_in, test_out)
-
             elif algorithm == 'Retea neuronala(from zero)':
                 if tuning_method == 'Grid Search':
                     metrics = alg.optimized_neural_network_from_zero_grid_search(train_in, train_out, test_in, test_out)
@@ -248,11 +238,10 @@ class Application(tk.Tk):
 
             self.results_text.delete(1.0, tk.END)
             self.results_text.insert(tk.END, "Metrici de evaluare:\n\n")
-            self.results_text.insert(tk.END, f"{metrics:}\n")
-            # self.results_text.insert(tk.END, f"MAE: {metrics[1]:}\n")
-            # self.results_text.insert(tk.END, f"RMSE: {metrics[2]:}\n")
-            # self.results_text.insert(tk.END, f"R²: {metrics[3]:}\n")
-            self.results_text.insert(tk.END, f"Best Params: {params if params else '– niciun parametru tuning –'}\n")
+            self.results_text.insert(tk.END, f"MSE: {metrics[0]:}\n")
+            self.results_text.insert(tk.END, f"MAE: {metrics[1]:}\n")
+            self.results_text.insert(tk.END, f"RMSE: {metrics[2]:}\n")
+            self.results_text.insert(tk.END, f"R²: {metrics[3]:}\n")
         except Exception as e:
             messagebox.showerror("Eroare", f"A apărut o eroare: {str(e)}")
 
